@@ -78,7 +78,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
     private readonly host: Selection<HTMLElement, unknown, null, unknown>;
 
     private customOutlineCallback: ((subSelection: CustomVisualSubSelection) => SubSelectionRegionOutlineFragment[]) | undefined;
-    private formatMode: boolean;
+    private formatMode: boolean | undefined;
     private readonly customElementCallback: ((subSelection: CustomVisualSubSelection) => HTMLElement[]) | undefined;
     private readonly hostElement: HTMLElement;
     private readonly selectionIdCallback: ((e: HTMLElement) => ISelectionId) | undefined;
@@ -86,9 +86,9 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
     private readonly subSelectionService: IVisualSubSelectionService;
     private subSelectionRegionOutlines: Record<string, HelperSubSelectionRegionOutline>;
     // maintain some state for reapplciation of subselections (e.g. scroll)
-    private subSelections: CustomVisualSubSelection[];
-    private scrollSubSelections: CustomVisualSubSelection[];
-    private scrollDebounce: () => void;
+    private subSelections: CustomVisualSubSelection[] | undefined;
+    private scrollSubSelections: CustomVisualSubSelection[] | undefined;
+    private scrollDebounce: (() => void) | undefined;
 
     private constructor(
         args: HtmlSubselectionHelperArgs,
@@ -164,7 +164,8 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         if (this.scrollSubSelections) {
             return;
         }
-        this.subSelectionService.subSelect(undefined);
+        // The service clears the current sub-selection when it receives no sub-selection.
+        this.subSelectionService.subSelect(undefined as unknown as CustomVisualSubSelection);
         this.scrollSubSelections = this.subSelections;
     }
 
@@ -302,7 +303,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         const selectionId = this.selectionIdCallback ? this.selectionIdCallback(subSelectionElement) : undefined;
         const objectName = d3.select(subSelectionElement).attr(SubSelectableObjectNameAttribute);
         const displayName = this.getDisplayNameFromElement(subSelectionElement);
-        const subSelectionType = this.getSubSelectionTypeFromElement(subSelectionElement);
+        const subSelectionType = this.getSubSelectionTypeFromElement(subSelectionElement) as SubSelectionStylesType;
         const selectionOrigin = {
             x: event.clientX,
             y: event.clientY,
@@ -320,7 +321,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         };
     }
 
-    private getSubSelectionElementsFromSubSelectionSource(subSelectionSource: HtmlSubSelectionSource): HTMLElement[] {
+    private getSubSelectionElementsFromSubSelectionSource(subSelectionSource: HtmlSubSelectionSource | undefined): HTMLElement[] {
         if (!subSelectionSource) {
             return [];
         }
@@ -337,7 +338,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         const { objectName, selectionId } = visualSubSelection.customVisualObjects[0];
         let filteredSelectionElements = subSelectables.filter((subSelectable) => subSelectable.getAttribute(SubSelectableObjectNameAttribute) === objectName);
         if (this.selectionIdCallback) {
-            const callback = (e: HTMLElement): ISelectionId => this.selectionIdCallback(e);
+            const callback = (e: HTMLElement): ISelectionId => this.selectionIdCallback!(e);
             filteredSelectionElements = filteredSelectionElements.filter((element) => equalsSelectionId(selectionId, callback(element)));
         }
 
@@ -373,8 +374,8 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
 
     private getSubSelectionRegionOutline(id: SubSelectionRegionOutlineId, elements: HTMLElement[], visibility: SubSelectionOutlineVisibility): HelperSubSelectionRegionOutline {
         const outlines: RectangleSubSelectionOutline[] = [];
-        let regionClipElement: HTMLElement;
-        let regionClampElement: HTMLElement;
+        let regionClipElement: HTMLElement | undefined;
+        let regionClampElement: HTMLElement | undefined;
 
         for (const element of elements) {
             let outline: RectangleSubSelectionOutline = this.getRectangleSubSelectionOutline(element);
@@ -425,7 +426,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
     }
 
     private getRestrictionElement(element: HTMLElement, type: SubSelectionOutlineRestrictionType): HTMLElement | undefined {
-        const restrictionElement: HTMLElement = element.closest(`[${SubSelectableRestrictingElementAttribute}="${type}"]`);
+        const restrictionElement = element.closest<HTMLElement>(`[${SubSelectableRestrictingElementAttribute}="${type}"]`);
         if (restrictionElement && helperOwnsElement(this.hostElement, restrictionElement)) {
             return restrictionElement;
         }
@@ -524,11 +525,12 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
     }
 
     // Updates the subselected attribute status on the elements associated with the VisualSubSelection
-    public setSubSelectedStateDOM(subSelections: CustomVisualSubSelection[]): void {
+    public setSubSelectedStateDOM(subSelections: CustomVisualSubSelection[] | undefined): void {
         if (!subSelections) {
             return;
         }
 
+        const currentSubSelections = subSelections;
         // Update the sub-selection status on the elements
         const subSelectables = this.getSubSelectableElements();
         const isElementSubSelected = this.isElementSubSelected;
@@ -539,7 +541,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
                 let isSubSelected = false;
                 // eslint-disable-next-line
                 const element = this;
-                isSubSelected = isElementSubSelected(element, subSelections, selectionIdCallbackFn!);
+                isSubSelected = isElementSubSelected(element, currentSubSelections, selectionIdCallbackFn!);
 
                 if (isSubSelected) {
                     return true;
@@ -574,7 +576,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
     /**
      * @returns visualSubSelections that matched a custom outline
      */
-    public updateCustomOutlinesFromSubSelections(subSelections: CustomVisualSubSelection[], visibility: SubSelectionOutlineVisibility = SubSelectionOutlineVisibility.Active): CustomVisualSubSelection[] {
+    public updateCustomOutlinesFromSubSelections(subSelections: CustomVisualSubSelection[] | undefined, visibility: SubSelectionOutlineVisibility = SubSelectionOutlineVisibility.Active): CustomVisualSubSelection[] {
         const visualSubSelectionsWithCustomOutlines: CustomVisualSubSelection[] = [];
         if (this.customOutlineCallback && !isArrayEmpty(subSelections)) {
             for (const subSelection of subSelections) {
@@ -600,7 +602,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         }
     }
 
-    public updateOutlinesFromSubSelections(subSelections: CustomVisualSubSelection[], clearExistingOutlines?: boolean, suppressRender?: boolean): void {
+    public updateOutlinesFromSubSelections(subSelections: CustomVisualSubSelection[] | undefined, clearExistingOutlines?: boolean, suppressRender?: boolean): void {
         if (clearExistingOutlines) {
             this.hideAllOutlines(true);
         }
@@ -640,7 +642,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         el.setAttribute(SubSelectionData, JSON.stringify(data));
     }
 
-    public static getDataForElement(el: HTMLElement | SVGElement): SubSelectionElementData {
+    public static getDataForElement(el: HTMLElement | SVGElement): SubSelectionElementData | null {
         return el.hasAttribute(SubSelectionData) ? JSON.parse(el.getAttribute(SubSelectionData)!) : null;
     }
 
@@ -699,7 +701,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         return outlineId as SubSelectionRegionOutlineId;
     }
 
-    public getAllSubSelectables(filterType?: SubSelectionStylesType): CustomVisualSubSelection[] | undefined {
+    public getAllSubSelectables(filterType?: SubSelectionStylesType): CustomVisualSubSelection[] {
         const subSelectables = this.getSubSelectableElements();
         const uniquenessCallback = ((a: HTMLElement, b: HTMLElement): boolean =>
             a.getAttribute(SubSelectableObjectNameAttribute) === b.getAttribute(SubSelectableObjectNameAttribute)
@@ -743,14 +745,15 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
 
     public createVisualSubSelectionForSingleObject(createVisualSubSelectionArgs: CreateVisualSubSelectionFromObjectArgs): CustomVisualSubSelection {
         const { objectName, subSelectionType, displayName, showUI, selectionId, selectionOrigin, focusOrder, metadata } = createVisualSubSelectionArgs;
-        const useOfssetInSelection = selectionOrigin && subSelectionType in [SubSelectionStylesType.Text, SubSelectionStylesType.NumericText];
-        const origin = useOfssetInSelection ? { ...selectionOrigin, offset: { x: 0, y: (selectionOrigin?.y) * -1 } } : selectionOrigin;
+        const useOffsetInSelection = selectionOrigin
+            && (subSelectionType === SubSelectionStylesType.Text || subSelectionType === SubSelectionStylesType.NumericText);
+        const origin = useOffsetInSelection ? { ...selectionOrigin, offset: { x: 0, y: selectionOrigin.y * -1 } } : selectionOrigin;
         const visualSubSelection: CustomVisualSubSelection = {
-            customVisualObjects: [{ objectName, selectionId: selectionId ?? undefined }],
+            customVisualObjects: [{ objectName, selectionId: (selectionId ?? undefined) as ISelectionId }],
             showUI,
             displayName,
             subSelectionType,
-            selectionOrigin: origin,
+            selectionOrigin: origin as CustomVisualSubSelection["selectionOrigin"],
             ...metadata ? { metadata } : {},
             ...focusOrder ? { focusOrder } : {},
 
@@ -760,14 +763,14 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
 
     private createSubSelectionFromElement(element: HTMLElement, showUI: boolean, event: PointerEvent | undefined, prevSelectionOrigin: IPoint,): CustomVisualSubSelection {
         // Need to get display name from jqdata, get selector from datum
-        const objectName = element.getAttribute(SubSelectableObjectNameAttribute);
+        const objectName = element.getAttribute(SubSelectableObjectNameAttribute) as string;
 
-        let selectionId: powerbi.visuals.ISelectionId;
+        let selectionId: powerbi.visuals.ISelectionId | undefined;
         if (this.selectionIdCallback) {
             selectionId = this.selectionIdCallback(element);
         }
 
-        const subSelectionType = this.getSubSelectionTypeFromElement(element);
+        const subSelectionType = this.getSubSelectionTypeFromElement(element) as SubSelectionStylesType;
         const displayName = this.getDisplayNameFromElement(element);
         let selectionOrigin: IPoint = prevSelectionOrigin;
         if (event) {
