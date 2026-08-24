@@ -17,21 +17,7 @@ export default [
     ...tseslint.configs.recommended,
     powerbiVisualsPlugin.configs.recommended,
     {
-        files: ["src/**/*.ts"],
-        rules: {
-            "@typescript-eslint/explicit-module-boundary-types": "off",
-            "@typescript-eslint/no-explicit-any": "off",
-            "@typescript-eslint/no-inferrable-types": "off"
-        }
-    },
-    {
-        files: ["test/**/*.ts", "vitest.config.mts"],
-        languageOptions: {
-            parserOptions: {
-                project: "./test/tsconfig.json",
-                tsconfigRootDir: import.meta.dirname
-            }
-        },
+        files: ["**/*.ts", "**/*.mts"],
         rules: {
             "@typescript-eslint/explicit-module-boundary-types": "off",
             "@typescript-eslint/no-explicit-any": "off",
