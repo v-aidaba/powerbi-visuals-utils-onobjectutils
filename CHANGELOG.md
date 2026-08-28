@@ -7,6 +7,8 @@
 
 ### Fixed
 * `createVisualSubSelectionForSingleObject` did not anchor the selection origin for `NumericText` and wrongly anchored it for `None`: the sub-selection type was matched with `in`, which checks array indices instead of values
+* `getAllSubSelectables` ignored the filter when it was `SubSelectionStylesType.None` and returned every sub-selectable instead: the member is `0`, so it did not pass the truthiness check the filter was guarded with
+* the sub-selection type of an element whose `data-sub-selection-type` attribute is missing or not a known member now falls back to `SubSelectionStylesType.None`, instead of putting `undefined` or `NaN` into the `subSelectionType` of the emitted sub-selection
 * added the missing `typescript` dev dependency
 
 ### Other changes
