@@ -14,20 +14,21 @@ export interface Rect {
     height: number;
 }
 
+// Laid out for real instead of stubbing `getBoundingClientRect`: fixed positioning makes the box
+// viewport-relative, so the element's rect is exactly the one requested here.
 export function setRect(element: Element, rect: Rect): void {
     const x = rect.x ?? 0;
     const y = rect.y ?? 0;
-    element.getBoundingClientRect = (): DOMRect => ({
-        x,
-        y,
-        left: x,
-        top: y,
-        width: rect.width,
-        height: rect.height,
-        right: x + rect.width,
-        bottom: y + rect.height,
-        toJSON: () => ({}),
-    }) as DOMRect;
+    const style = (element as HTMLElement).style;
+    style.position = "fixed";
+    style.boxSizing = "border-box";
+    style.margin = "0";
+    style.padding = "0";
+    style.border = "0";
+    style.left = `${x}px`;
+    style.top = `${y}px`;
+    style.width = `${rect.width}px`;
+    style.height = `${rect.height}px`;
 }
 
 export interface SubSelectableOptions {

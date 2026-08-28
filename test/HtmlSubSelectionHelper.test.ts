@@ -507,7 +507,7 @@ describe("HtmlSubSelectionHelper", () => {
             createSubSelectable(host, { objectName: "top", displayName: "Top", rect: { x: 0, y: 0, width: 10, height: 10 } });
             createSubSelectable(host, { objectName: "top", displayName: "Top", rect: { x: 20, y: 0, width: 10, height: 10 } });
 
-            const subSelections = helper.getAllSubSelectables()!;
+            const subSelections = helper.getAllSubSelectables();
 
             expect(subSelections.map(subSelection => subSelection.displayName)).toEqual(["Top", "Bottom"]);
             expect(subSelections[0].selectionOrigin).toEqual({ x: 5, y: 5 });
@@ -528,10 +528,43 @@ describe("HtmlSubSelectionHelper", () => {
             createSubSelectable(host, { objectName: "text", subSelectionType: SubSelectionStylesType.Text });
             createSubSelectable(host, { objectName: "shape", subSelectionType: SubSelectionStylesType.Shape });
 
-            const subSelections = helper.getAllSubSelectables(SubSelectionStylesType.Shape)!;
+            const subSelections = helper.getAllSubSelectables(SubSelectionStylesType.Shape);
 
             expect(subSelections).toHaveLength(1);
             expect(subSelections[0].customVisualObjects[0].objectName).toBe("shape");
+        });
+
+        it("filters sub-selectables by the zero-valued None type", () => {
+            const helper = createHelper();
+            createSubSelectable(host, { objectName: "none", subSelectionType: SubSelectionStylesType.None });
+            createSubSelectable(host, { objectName: "shape", subSelectionType: SubSelectionStylesType.Shape });
+            createSubSelectable(host, { objectName: "text", subSelectionType: SubSelectionStylesType.Text });
+
+            const subSelections = helper.getAllSubSelectables(SubSelectionStylesType.None);
+
+            expect(subSelections).toHaveLength(1);
+            expect(subSelections[0].customVisualObjects[0].objectName).toBe("none");
+        });
+
+        it("defaults the sub-selection type to None when the element has no type attribute", () => {
+            const helper = createHelper();
+            createSubSelectable(host, { objectName: "untyped", rect: { x: 0, y: 0, width: 10, height: 10 } });
+
+            const subSelections = helper.getAllSubSelectables();
+
+            expect(subSelections).toHaveLength(1);
+            expect(subSelections[0].subSelectionType).toBe(SubSelectionStylesType.None);
+        });
+
+        it("defaults the sub-selection type to None when the type attribute is not a known value", () => {
+            const helper = createHelper();
+            const element = createSubSelectable(host, { objectName: "broken", rect: { x: 0, y: 0, width: 10, height: 10 } });
+            element.setAttribute("data-sub-selection-type", "shape");
+
+            const subSelections = helper.getAllSubSelectables();
+
+            expect(subSelections).toHaveLength(1);
+            expect(subSelections[0].subSelectionType).toBe(SubSelectionStylesType.None);
         });
 
         it("ignores sub-selectable elements owned by another helper", () => {

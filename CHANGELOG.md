@@ -2,15 +2,17 @@
 ### Breaking changes
 * the package is published as ES2020 modules instead of CommonJS, in line with the other `powerbi-visuals-utils-*` v7 packages
 * `powerbi-visuals-api` moved to `devDependencies`: it is no longer installed transitively and has to be declared by the visual
+* `HtmlSubSelectionHelper.getDataForElement` is now typed as `SubSelectionElementData | null`, matching what it returns for elements without the data attribute: consumers on `strictNullChecks` have to handle the `null` case
+* `ISubSelectionHelper.getAllSubSelectables` takes a new optional `filterType` parameter: existing implementations outside this repo still compile, but they silently ignore the filter and return every sub-selectable until they are updated
 
 ### Fixed
 * `createVisualSubSelectionForSingleObject` did not anchor the selection origin for `NumericText` and wrongly anchored it for `None`: the sub-selection type was matched with `in`, which checks array indices instead of values
-* `HtmlSubSelectionHelper.getDataForElement` is now typed as `SubSelectionElementData | null`, matching what it returns for elements without the data attribute
 * added the missing `typescript` dev dependency
 
 ### Other changes
+* `isArrayEmpty` is now generic and returns a type predicate (`array is undefined | null | []`) instead of taking `any[]` and returning `boolean`: existing calls still compile, but the argument is no longer inferred as `any` and the result now narrows the array at the call site
 * the published package is limited to `lib` and the docs via the `files` field, instead of relying on the ignore rules
-* unit tests migrated to Vitest 4
+* unit tests migrated to Vitest 4 and run in Chromium via `@vitest/browser` and Playwright, so the outline geometry is validated against real browser layout instead of a stubbed `getBoundingClientRect`
 * ESLint migrated to the flat config, updated to ESLint 9 and typescript-eslint 8
 * `strict` mode enabled
 * new scripts: `prebuild`, `prepublishOnly`, `test:typecheck`, `lint:fix`

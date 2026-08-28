@@ -21,6 +21,14 @@ import SubSelectionRegionOutlineId = powerbi.visuals.SubSelectionRegionOutlineId
 type HelperSubSelectionRegionOutline<TOutline extends SubSelectionRegionOutline = SubSelectionRegionOutline> = TOutline & { id: SubSelectionRegionOutlineId };
 const d3 = { select, selectAll };
 
+// `SubSelectionStylesType` is a const enum, so its members have to be listed to be checked at runtime.
+const knownSubSelectionStylesTypes: readonly SubSelectionStylesType[] = [
+    SubSelectionStylesType.None,
+    SubSelectionStylesType.Text,
+    SubSelectionStylesType.NumericText,
+    SubSelectionStylesType.Shape,
+];
+
 // Used on the sub-selectable element
 const eventSuffix = 'htmlSubSelection';
 const subSelectableClassAndSelector = createClassAndSelector('sub-selectable');
@@ -164,7 +172,8 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         if (this.scrollSubSelections) {
             return;
         }
-        // The service clears the current sub-selection when it receives no sub-selection.
+        // The service clears the current sub-selection when it receives no sub-selection,
+        // but `IVisualSubSelectionService.subSelect` declares its parameter as required.
         this.subSelectionService.subSelect(undefined as unknown as CustomVisualSubSelection);
         this.scrollSubSelections = this.subSelections;
     }
@@ -303,7 +312,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         const selectionId = this.selectionIdCallback ? this.selectionIdCallback(subSelectionElement) : undefined;
         const objectName = d3.select(subSelectionElement).attr(SubSelectableObjectNameAttribute);
         const displayName = this.getDisplayNameFromElement(subSelectionElement);
-        const subSelectionType = this.getSubSelectionTypeFromElement(subSelectionElement) as SubSelectionStylesType;
+        const subSelectionType = this.getSubSelectionTypeFromElement(subSelectionElement) ?? SubSelectionStylesType.None;
         const selectionOrigin = {
             x: event.clientX,
             y: event.clientY,
@@ -530,7 +539,6 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
             return;
         }
 
-        const currentSubSelections = subSelections;
         // Update the sub-selection status on the elements
         const subSelectables = this.getSubSelectableElements();
         const isElementSubSelected = this.isElementSubSelected;
@@ -541,7 +549,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
                 let isSubSelected = false;
                 // eslint-disable-next-line
                 const element = this;
-                isSubSelected = isElementSubSelected(element, currentSubSelections, selectionIdCallbackFn!);
+                isSubSelected = isElementSubSelected(element, subSelections, selectionIdCallbackFn!);
 
                 if (isSubSelected) {
                     return true;
@@ -712,7 +720,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         );
         const subSelectableElements = getUniques(subSelectables, uniquenessCallback);
         let filteredTypeSubSelectableElements = subSelectableElements;
-        if (filterType) {
+        if (filterType !== undefined) {
             filteredTypeSubSelectableElements = subSelectableElements.filter((subSelectableElement: HTMLElement) => {
                 const type = this.getSubSelectionTypeFromElement(subSelectableElement);
                 return Number(type) === filterType;
@@ -749,10 +757,12 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
             && (subSelectionType === SubSelectionStylesType.Text || subSelectionType === SubSelectionStylesType.NumericText);
         const origin = useOffsetInSelection ? { ...selectionOrigin, offset: { x: 0, y: selectionOrigin.y * -1 } } : selectionOrigin;
         const visualSubSelection: CustomVisualSubSelection = {
+            // `CustomVisualObject.selectionId` is declared required, but a sub-selection may legitimately have no selection id.
             customVisualObjects: [{ objectName, selectionId: (selectionId ?? undefined) as ISelectionId }],
             showUI,
             displayName,
             subSelectionType,
+            // `CustomVisualSubSelection.selectionOrigin` is declared required, but the origin is optional for this helper.
             selectionOrigin: origin as CustomVisualSubSelection["selectionOrigin"],
             ...metadata ? { metadata } : {},
             ...focusOrder ? { focusOrder } : {},
@@ -770,7 +780,7 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
             selectionId = this.selectionIdCallback(element);
         }
 
-        const subSelectionType = this.getSubSelectionTypeFromElement(element) as SubSelectionStylesType;
+        const subSelectionType = this.getSubSelectionTypeFromElement(element) ?? SubSelectionStylesType.None;
         const displayName = this.getDisplayNameFromElement(element);
         let selectionOrigin: IPoint = prevSelectionOrigin;
         if (event) {
@@ -800,7 +810,8 @@ export class HtmlSubSelectionHelper implements ISubSelectionHelper<HTMLElement, 
         if (!type) {
             return undefined;
         }
-        return Number(type);
+        const parsedType = Number(type);
+        return knownSubSelectionStylesTypes.find(knownType => knownType === parsedType);
     }
 
     private getSubSelectableElements(): HTMLElement[] {

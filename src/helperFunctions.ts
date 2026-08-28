@@ -55,6 +55,7 @@ export function isEqual(value: any, other: any): boolean {
     return false;
 }
 
+// `[]` is the empty tuple type, not an array type: it is what narrows the false branch to a non-empty `T[]` at the call sites.
 export function isArrayEmpty<T>(array: T[] | undefined | null): array is undefined | null | [] {
     if (!array || array.length === 0) {
         return true;
